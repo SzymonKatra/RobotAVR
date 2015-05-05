@@ -15,4 +15,4 @@ EFuse: 07
 
 Fuse bit configuration included in Eclipse project.
 
-![RobotAVR Front Photo](/photos/photo1.png)
+![RobotAVR Front Photo](/photos/photo_1.JPG)
