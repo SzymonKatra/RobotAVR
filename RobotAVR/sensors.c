@@ -62,6 +62,10 @@ void sensorsInit()
 	s_rightTime = 0;
 	s_frontTime = 0;
 
+	s_leftBeginPulseTick = 0;
+	s_rightBeginPulseTick = 0;
+	s_frontBeginPulseTick = 0;
+
 	s_currentSensor = 0;
 	OCR1A = 22;
 	TIMSK1 |= (1 << TOIE1); // interrupt every 32.768 ms, each sensor updates every ~ 100ms alternately
