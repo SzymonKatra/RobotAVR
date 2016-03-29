@@ -8,23 +8,28 @@
 #include "sensors.h"
 #include "api.h"
 #include <stdio.h>
+#include <util/atomic.h>
 
-#define SPEED 40
-#define PULSES 10
+#define MIN_SPEED CONTROLLER_CALIBRATION_MIN_SPEED
+#define MAX_SPEED CONTROLLER_CALIBRATION_MAX_SPEED
+#define SPEED_STEP CONTROLLER_CALIBRATION_SPEED_STEP
+
 #define PULSES_TURN 2
 
-#define DISTANCE_LIMIT (13 * 58)
-#define NEW_DISTANCE_LIMIT (16 * 58)
+#define DISTANCE_LIMIT (14 * 58)
+#define NEW_DISTANCE_LIMIT (17 * 58)
 
-#define SIDE_DISTANCE_LIMIT (11 * 58)
-#define SIDE_NEW_DISTANCE_LIMIT (13 * 58)
+#define SIDE_DISTANCE_LIMIT (12 * 58)
+#define SIDE_NEW_DISTANCE_LIMIT (14 * 58)
 
-#define PRECISE_SIDE_DISTANCE_LIMIT (6 * 58)
-#define PRECISE_SIDE_NEW_DISTANCE_LIMIT (6 * 58)
+#define PRECISE_SIDE_DISTANCE_LIMIT (7 * 58)
+#define PRECISE_SIDE_NEW_DISTANCE_LIMIT (7 * 58)
 
 #define BETWEEN_WALL_DIFFERENCE (8 * 58)
 
 //#define SIDE_SAME_TOLERANCE (3 * 58)
+
+#define STRAIGHT_MOVE_MODE CONTROLLER_LEFT_AND_RIGHT
 
 #define SENSORS_STEP 5
 #define SENSORS_SMALL_STEP 2
@@ -35,6 +40,12 @@
 
 static uint8_t s_timerCounter;
 static uint8_t s_started;
+static volatile uint8_t s_buttonPressed;
+static volatile uint8_t s_buttonLock;
+static uint8_t s_speed;
+static uint8_t s_straightMode;
+
+#define CURRENT_PULSES (clamp(s_speed / 2, 5, 20))
 
 void mainInit();
 
@@ -44,12 +55,21 @@ void mainSensors();
 void mainTimerTick();
 
 uint8_t mainCheckModeChange();
+uint8_t mainCheckSpeedChange(uint8_t c);
+uint8_t mainHandleButton();
 
 int16_t abs(int16_t x)
 {
 	if (x < 0)
 		return x * -1;
 	else return x;
+}
+uint8_t clamp(uint8_t val, uint8_t min, uint8_t max)
+{
+	if (val < min) return min;
+	else if (val > max) return max;
+
+	return val;
 }
 
 int main()
@@ -77,8 +97,10 @@ void mainBluetooth()
 	cmd = lastcmd = 0;
 	while(1)
 	{
+		if (mainHandleButton()) return;
 		if (remotePoll(&cmd))
 		{
+			mainCheckSpeedChange(cmd);
 			if (cmd == 'x')
 			{
 				controllerStop();
@@ -89,7 +111,15 @@ void mainBluetooth()
 			{
 				if (cmd == 'w' || cmd == 's')
 				{
-					controllerSetCommonPulses(PULSES);
+					if (s_straightMode == CONTROLLER_LEFT_AND_RIGHT_COMMON)
+					{
+						controllerSetCommonPulses(CURRENT_PULSES);
+					}
+					else
+					{
+						controllerSetLeftPulses(CURRENT_PULSES / 2);
+						controllerSetRightPulses(CURRENT_PULSES / 2);
+					}
 				}
 				else if (cmd == 'a' || cmd == 'd')
 				{
@@ -103,19 +133,19 @@ void mainBluetooth()
 				switch (cmd)
 				{
 				case 'w':
-					controllerMove(CONTROLLER_FORWARD, SPEED, PULSES, CONTROLLER_LEFT_AND_RIGHT_COMMON);
+					controllerMove(CONTROLLER_FORWARD, s_speed, CURRENT_PULSES, s_straightMode);
 					break;
 
 				case 'a':
-					controllerMove(CONTROLLER_BACKWARD, SPEED, PULSES_TURN, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
+					controllerMove(CONTROLLER_BACKWARD, s_speed, PULSES_TURN, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
 					break;
 
 				case 's':
-					controllerMove(CONTROLLER_BACKWARD, SPEED, PULSES, CONTROLLER_LEFT_AND_RIGHT_COMMON);
+					controllerMove(CONTROLLER_BACKWARD, s_speed, CURRENT_PULSES, s_straightMode);
 					break;
 
 				case 'd':
-					controllerMove(CONTROLLER_FORWARD, SPEED, PULSES_TURN, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
+					controllerMove(CONTROLLER_FORWARD, s_speed, PULSES_TURN, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
 					break;
 				}
 			}
@@ -129,14 +159,14 @@ void mainSensors()
 
 	while(1)
 	{
-		uint8_t cmd;
+		/*uint8_t cmd;
 		if (remotePoll(&cmd))
 		{
 			controllerStop();
 			return;
-		}
+		}*/
 
-		controllerMove(CONTROLLER_FORWARD, SPEED, 0xFFFF, CONTROLLER_LEFT_AND_RIGHT_COMMON);
+		controllerMove(CONTROLLER_FORWARD, s_speed, 0xFFFF, s_straightMode);
 		while (sensorsGetFrontTime() > DISTANCE_LIMIT && sensorsGetLeftTime() > SIDE_DISTANCE_LIMIT && sensorsGetRightTime() > SIDE_DISTANCE_LIMIT)
 		{
 			s_rotations = 0;
@@ -155,11 +185,11 @@ void mainSensors()
 				s_rotations++;
 				if (goLeft)
 				{
-					controllerMove(CONTROLLER_BACKWARD, SPEED, SENSORS_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
+					controllerMove(CONTROLLER_BACKWARD, s_speed, SENSORS_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
 				}
 				else
 				{
-					controllerMove(CONTROLLER_FORWARD, SPEED, SENSORS_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
+					controllerMove(CONTROLLER_FORWARD, s_speed, SENSORS_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
 				}
 
 				while(controllerIsBusy()) if (mainCheckModeChange()) return;
@@ -167,7 +197,7 @@ void mainSensors()
 		}
 		else if (abs((int16_t)sensorsGetLeftTime() - (int16_t)sensorsGetRightTime()) <= BETWEEN_WALL_DIFFERENCE && sensorsGetFrontTime() > DISTANCE_LIMIT)
 		{
-			controllerMove(CONTROLLER_FORWARD, SPEED, 10, CONTROLLER_LEFT_AND_RIGHT_COMMON);
+			controllerMove(CONTROLLER_FORWARD, s_speed, 10, s_straightMode);
 			while(controllerIsBusy()) if (mainCheckModeChange()) return;
 		}
 		else if (sensorsGetLeftTime() <= sideDistanceLimit)
@@ -175,7 +205,7 @@ void mainSensors()
 			s_rotations++;
 			while (sensorsGetLeftTime() < sideNewDistanceLimit)
 			{
-				controllerMove(CONTROLLER_FORWARD, SPEED, SENSORS_SMALL_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
+				controllerMove(CONTROLLER_FORWARD, s_speed, SENSORS_SMALL_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
 				while(controllerIsBusy()) if (mainCheckModeChange()) return;
 			}
 		}
@@ -184,14 +214,14 @@ void mainSensors()
 			s_rotations++;
 			while (sensorsGetRightTime() < sideNewDistanceLimit)
 			{
-				controllerMove(CONTROLLER_BACKWARD, SPEED, SENSORS_SMALL_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
+				controllerMove(CONTROLLER_BACKWARD, s_speed, SENSORS_SMALL_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
 				while(controllerIsBusy()) if (mainCheckModeChange()) return;
 			}
 		}
 		else
 		{
 			controllerMove((sensorsGetLeftTime() > sensorsGetRightTime() ? CONTROLLER_BACKWARD : CONTROLLER_FORWARD),
-								       SPEED, SENSORS_180_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
+								       s_speed, SENSORS_180_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
 			while(controllerIsBusy()) if (mainCheckModeChange()) return;
 			s_rotations = 0;
 		}
@@ -199,7 +229,7 @@ void mainSensors()
 		if (s_rotations >= SENSORS_MAX_SMALL_ROTATIONS)
 		{
 			controllerMove((sensorsGetLeftTime() > sensorsGetRightTime() ? CONTROLLER_BACKWARD : CONTROLLER_FORWARD),
-					       SPEED, SENSORS_180_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
+					       s_speed, SENSORS_180_STEP, CONTROLLER_LEFT_AND_OPPOSITE_RIGHT);
 			while(controllerIsBusy()) if (mainCheckModeChange()) return;
 			s_rotations = 0;
 		}
@@ -209,12 +239,57 @@ void mainSensors()
 uint8_t mainCheckModeChange()
 {
 	uint8_t cmd;
-	if (remotePoll(&cmd) && cmd == 'x')
+	uint8_t polled = remotePoll(&cmd);
+	if (polled) mainCheckSpeedChange(cmd);
+	if ((polled && cmd == 'x') || mainHandleButton())
 	{
 		controllerStop();
 		return 1;
 	}
 	return 0;
+}
+uint8_t mainCheckSpeedChange(uint8_t c)
+{
+	uint8_t changed = 0;
+	int16_t tmpSpeed = (int16_t)s_speed;
+	if (c == '+')
+	{
+		tmpSpeed += SPEED_STEP;
+		changed = 1;
+	}
+	else if (c == '-')
+	{
+		tmpSpeed -= SPEED_STEP;
+		changed = 1;
+	}
+	else if (c == 'm')
+	{
+		s_straightMode = (s_straightMode == CONTROLLER_LEFT_AND_RIGHT ? CONTROLLER_LEFT_AND_RIGHT_COMMON : CONTROLLER_LEFT_AND_RIGHT);
+		changed = 1;
+	}
+	else if (c == 'c')
+	{
+		uint8_t current = controllerGetCalibrateWhileMoving();
+		controllerSetCalibrateWhileMoving(current == 0 ? 1 : 0);
+	}
+
+	if (tmpSpeed < MIN_SPEED) tmpSpeed = MIN_SPEED;
+	else if (tmpSpeed > MAX_SPEED) tmpSpeed = MAX_SPEED;
+	s_speed = (uint8_t)tmpSpeed;
+
+	return changed;
+}
+
+uint8_t mainHandleButton()
+{
+	uint8_t pressed;
+	ATOMIC_BLOCK(ATOMIC_FORCEON)
+	{
+		pressed = s_buttonPressed;
+		s_buttonPressed = 0;
+	}
+
+	return pressed;
 }
 
 void mainTimerTick()
@@ -225,6 +300,20 @@ void mainTimerTick()
 		{
 			s_timerCounter = 0;
 			ledToggle();
+		}
+
+		if (buttonIsPressed())
+		{
+			if (!s_buttonLock)
+			{
+				s_buttonPressed = 1;
+				s_buttonLock = 1;
+			}
+		}
+		else
+		{
+			s_buttonPressed = 0;
+			s_buttonLock = 0;
 		}
 	}
 }
@@ -239,6 +328,10 @@ void mainInit()
 
 	s_timerCounter = 0;
 	s_started = 0;
+	s_buttonPressed = 0;
+	s_buttonLock = 0;
+	s_speed = 40;
+	s_straightMode = CONTROLLER_LEFT_AND_RIGHT;
 
 	sei();
 

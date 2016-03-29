@@ -32,8 +32,8 @@
 #define CONTROLLER_TO_UNLOCK_CALIBRATION_TICKS 10
 
 #define CONTROLLER_CALIBRATION_INITIAL_TORQUE 200
-#define CONTROLLER_CALIBRATION_MIN_SPEED 30
-#define CONTROLLER_CALIBRATION_MAX_SPEED 40
+#define CONTROLLER_CALIBRATION_MIN_SPEED 10
+#define CONTROLLER_CALIBRATION_MAX_SPEED 60
 #define CONTROLLER_CALIBRATION_SPEED_STEP 5
 #define CONTROLLER_CALIBRATION_PULSES 200
 
@@ -55,5 +55,8 @@ void controllerMoveStartTorque(uint8_t direction, uint8_t speed, uint16_t pulses
 void controllerSetLeftPulses(uint16_t pulses);
 void controllerSetRightPulses(uint16_t pulses);
 void controllerSetCommonPulses(uint16_t pulses);
+
+void controllerSetCalibrateWhileMoving(uint8_t state);
+uint8_t controllerGetCalibrateWhileMoving();
 
 #endif /* ROBOTAVR_CONTROLLER_H_ */

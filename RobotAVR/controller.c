@@ -29,6 +29,7 @@ static volatile controllerInternalMoveData_t s_right;
 
 static volatile controllerCalibration_t s_calibrating;
 static volatile uint8_t s_calibrationEnabled;
+static volatile uint8_t s_calibrateWhileMoving;
 
 static volatile timerTick_f s_timerTickFunction;
 
@@ -55,6 +56,7 @@ void controllerInitWithTimer(timerTick_f timerTick)
 	eepromReadData(0, &s_calibration, sizeof(controllerCalibration_t) * CALIBRATION_ARRAY_SIZE);
 
 	s_calibrationEnabled = 0;
+	s_calibrateWhileMoving = 0;
 
 	TCCR2B |= (1 << CS22) | (1 << CS21); // clk / 256 = 62.5 KHz
 	TIMSK2 |= (1 << TOIE2); // interrupt on overflow ~ 244 interrupts per second
@@ -207,6 +209,15 @@ uint8_t controllerIsBusy()
 	return tmp;
 }
 
+void controllerSetCalibrateWhileMoving(uint8_t state)
+{
+	s_calibrateWhileMoving = state;
+}
+uint8_t controllerGetCalibrateWhileMoving()
+{
+	return s_calibrateWhileMoving;
+}
+
 static void controllerResetData(volatile controllerInternalMoveData_t* data)
 {
 	data->enabled = 0;
@@ -256,7 +267,7 @@ static void controllerCommonHandler()
 		leftTorque = (int16_t)leftTmp;
 		rightTorque = (int16_t)rightTmp;
 
-		if (CONTROLLER_CALIBRATE_WHILE_MOVING || s_calibrationEnabled)
+		if (s_calibrateWhileMoving || s_calibrationEnabled)
 		{
 			int16_t leftPulsesDelta = (leftPulses - s_common.pulsesPerCalibrationPeriod) * CONTROLLER_CHANGE_FACTOR;
 			leftTorque -= leftPulsesDelta;
@@ -319,7 +330,7 @@ static int16_t controllerHandler(volatile controllerInternalMoveData_t* data, ui
 
 			int16_t newTorque = (int16_t)torque;
 
-			if (CONTROLLER_CALIBRATE_WHILE_MOVING || s_calibrationEnabled)
+			if (s_calibrateWhileMoving || s_calibrationEnabled)
 			{
 				int16_t pulsesDelta = (pulses - data->pulsesPerCalibrationPeriod) * CONTROLLER_CHANGE_FACTOR;
 				newTorque -= pulsesDelta;

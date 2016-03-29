@@ -1,12 +1,21 @@
 #include "sensors.h"
 
-#define LEFT_TRIG_DDR DDRC
+/*#define LEFT_TRIG_DDR DDRC
 #define LEFT_TRIG_PORT PORTC
 #define LEFT_TRIG_BIT PC3
 
 #define RIGHT_TRIG_DDR DDRC
 #define RIGHT_TRIG_PORT PORTC
 #define RIGHT_TRIG_BIT PC1
+*/
+
+#define RIGHT_TRIG_DDR DDRC
+#define RIGHT_TRIG_PORT PORTC
+#define RIGHT_TRIG_BIT PC3
+
+#define LEFT_TRIG_DDR DDRC
+#define LEFT_TRIG_PORT PORTC
+#define LEFT_TRIG_BIT PC1
 
 #define FRONT_TRIG_DDR DDRC
 #define FRONT_TRIG_PORT PORTC
@@ -14,11 +23,19 @@
 
 // all ECHOS belong to PCMSK1 and C segment
 
+/*
 #define LEFT_ECHO_BIT PC2
 #define LEFT_ECHO_PCINT PCINT10
 
 #define RIGHT_ECHO_BIT PC0
 #define RIGHT_ECHO_PCINT PCINT8
+*/
+
+#define RIGHT_ECHO_BIT PC2
+#define RIGHT_ECHO_PCINT PCINT10
+
+#define LEFT_ECHO_BIT PC0
+#define LEFT_ECHO_PCINT PCINT8
 
 #define FRONT_ECHO_BIT PC4
 #define FRONT_ECHO_PCINT PCINT12
