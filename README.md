@@ -19,3 +19,16 @@ EFuse: 07
 Fuse bit configuration included in Eclipse project.
 
 ![RobotAVR Front Photo](/photos/photo_1.JPG)
+
+Full controls list:
+w - forward
+s - reverse
+a - turn left
+d - turn right
+x - change mode - bluetooth / sensor - default bluetooth
++ - speed up by 5 pulses per second (60 maximum)
+- - speed down by 5 pulses per second (10 minimum)
+m - change straight mode - left and right wheels works separately or jointly while driving straight - default separately
+c - calibrate while moving - yes / no - default no
+
+Default speed is 40 pulses per second
