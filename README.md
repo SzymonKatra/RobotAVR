@@ -18,7 +18,7 @@ EFuse: 07
 
 Fuse bit configuration included in Eclipse project.
 
-![RobotAVR Front Photo](/photos/photo_1.JPG)
+![RobotAVR Front Photo](//szymonkatra.github.io/images/project/robotavr/photo_1.JPG)
 
 Controls list and basic info:
 * w - forward
