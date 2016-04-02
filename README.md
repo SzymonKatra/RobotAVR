@@ -31,3 +31,4 @@ Controls list and basic info:
 * m - change straight mode - left and right wheels works separately or jointly while driving straight - default separately
 * c - calibrate while moving - yes / no - default no
 * Default speed is 40 pulses per second
+* 20 pulses equals to one complete rotation of the wheel
